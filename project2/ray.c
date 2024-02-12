@@ -22,6 +22,7 @@
 pthread_t render_thread, physics_thread;
 sem_t new_frame_ready, physics_updated;
 
+pthread_mutex_t mutex;
 
 
 int main(int argc, char **argv) {
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
 		sem_init(&physics_updated,0,1); // initial physics considerd updated (1)
 
 		// thread for rendering
-		pthread_create(&render_thread,NULL,(void *(*)(void *))update_render,render_args);
+		pthread_create(&render_thread,NULL,update_render,render_args);
 
 		// thread for physics
 		//(void *(*)(void *)): @caleb not entirely sure, but the error told me this what I needed
@@ -118,7 +119,7 @@ int main(int argc, char **argv) {
 		// * pointer to function
 
 		// (void*) type of function pointer
-		pthread_create(&physics_thread,NULL,(void *(*)(void *))update_physics,ctx);
+		pthread_create(&physics_thread,NULL,update_physics,ctx);
 
 
 		// Join threads
@@ -140,18 +141,19 @@ out:
 }
 
 void *update_render(void *args){
-	printf("\nhe\n");
+	// printf("\nhe\n");
 	// @caleb arugments: struct framebuffer_pt4 * fb,struct context* ctx, int render_to_console,int frame,char **argv
 
 	// cast void pointer to render_arg pointer
 
-	struct Render_Args *render_args = (struct Render_Args *) render_args;
-	printf("\nshe\n");
+	struct Render_Args *render_args = args;
+	// printf("\nshe\n");
 	// get render args from render_args
 
 		// wait for physics to be updated
-		sem_wait(&physics_updated);
+		// sem_wait(&physics_updated);
 
+		// pthread_mutex_lock(&mutex);
 
 		render_scene(render_args->fb, render_args->ctx);
 
@@ -166,21 +168,31 @@ void *update_render(void *args){
 			render_bmp(render_args->fb, filepath);
 		}
 
-		sem_post(&new_frame_ready);
+		// pthread_mutex_unlock(&mutex);
+
+		// sem_post(&new_frame_ready);
 
 		return 0;
 
 }
 
 
-void *update_physics(struct context* ctx){
+void *update_physics(void * _ctx){ //#TODO Make sure velocity goes before position
 
-		sem_wait(&new_frame_ready);
+struct context* ctx = _ctx;
 
+		// sem_wait(&new_frame_ready);
+
+		pthread_mutex_lock(&mutex);
 		step_physics_velocity(ctx);
-		step_physics_position(ctx);
+		pthread_mutex_unlock(&mutex);
 
-		sem_post(&physics_updated);
+		pthread_mutex_lock(&mutex);
+		step_physics_position(ctx);
+		pthread_mutex_unlock(&mutex);
+		
+
+		// sem_post(&physics_updated);
 
 		return 0;
 }
