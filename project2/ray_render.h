@@ -51,6 +51,20 @@ static inline uint8_t color_double_to_u8(double d) {
 	return (uint8_t)(d * 255);
 }
 
+// @caleb custom function and struct declartions
+struct Render_Args {
+	struct framebuffer_pt4* fb;
+	struct context* ctx;
+	int render_to_console;
+	int frame;
+	char** argv;
+};
+
+
+void *update_render(void * args);
+void *update_physics(struct context* ctx);
+
+
 
 #endif	// RAY_RENDER_H__
 

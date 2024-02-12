@@ -13,6 +13,17 @@
 #include "ray_physics.h"
 #include "ray_console.h"
 
+// @caleb added
+#include <pthread.h>
+#include <semaphore.h>
+
+
+// create threads and semaphores
+pthread_t render_thread, physics_thread;
+sem_t new_frame_ready, physics_updated;
+
+
+
 int main(int argc, char **argv) {
 
 	int rc;
@@ -76,21 +87,47 @@ int main(int argc, char **argv) {
 	// framebuffer whilst outputting.                                                    //
 	// TODO: section 2: instead of one framebuffer, use 
 	///////////////////////////////////////////////////////////////////////////////////////
-	for (int frame = 0; frame < 4 * 25; frame++) {
-		render_scene(fb, ctx);
-		if (render_to_console) {
-			render_console(fb);
-			usleep(50000);
-		} else {
-			char filepath[128];
-			//snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.png", argv[2], frame);
-			//render_png(fb, filepath);
-			snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.bmp", argv[2], frame);
-			render_bmp(fb, filepath);
-		}
-		step_physics_velocity(ctx);
-		step_physics_position(ctx);
 
+	
+	// make render_args to put all arguements into renderThread
+	struct Render_Args* render_args = (struct Render_Args*)malloc(sizeof(struct Render_Args));
+
+	for (int frame = 0; frame < 4 * 25; frame++) {
+		
+
+		// update render args
+		render_args->fb = fb;
+		render_args->ctx = ctx;
+		render_args->render_to_console = render_to_console;
+		render_args->frame = frame;
+		render_args->argv = argv;
+
+		
+
+		sem_init(&new_frame_ready,0,0); // frame is not ready at first (0)
+
+		sem_init(&physics_updated,0,1); // initial physics considerd updated (1)
+
+		// thread for rendering
+		pthread_create(&render_thread,NULL,(void *(*)(void *))update_render,render_args);
+
+		// thread for physics
+		//(void *(*)(void *)): @caleb not entirely sure, but the error told me this what I needed
+		// void *: return type
+
+		// * pointer to function
+
+		// (void*) type of function pointer
+		pthread_create(&physics_thread,NULL,(void *(*)(void *))update_physics,ctx);
+
+
+		// Join threads
+		pthread_join(render_thread, NULL);
+		pthread_join(physics_thread, NULL);
+
+		// Destroy semaphores
+		sem_destroy(&new_frame_ready);
+		sem_destroy(&physics_updated);
 	}
 
 out:
@@ -102,3 +139,48 @@ out:
 	return 0;
 }
 
+void *update_render(void *args){
+	printf("\nhe\n");
+	// @caleb arugments: struct framebuffer_pt4 * fb,struct context* ctx, int render_to_console,int frame,char **argv
+
+	// cast void pointer to render_arg pointer
+
+	struct Render_Args *render_args = (struct Render_Args *) render_args;
+	printf("\nshe\n");
+	// get render args from render_args
+
+		// wait for physics to be updated
+		sem_wait(&physics_updated);
+
+
+		render_scene(render_args->fb, render_args->ctx);
+
+		if (render_args->render_to_console) {
+			render_console(render_args->fb);
+			usleep(50000);
+		} else {
+			char filepath[128];
+			//snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.png", argv[2], frame);
+			//render_png(fb, filepath);
+			snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.bmp", render_args->argv[2], render_args->frame);
+			render_bmp(render_args->fb, filepath);
+		}
+
+		sem_post(&new_frame_ready);
+
+		return 0;
+
+}
+
+
+void *update_physics(struct context* ctx){
+
+		sem_wait(&new_frame_ready);
+
+		step_physics_velocity(ctx);
+		step_physics_position(ctx);
+
+		sem_post(&physics_updated);
+
+		return 0;
+}

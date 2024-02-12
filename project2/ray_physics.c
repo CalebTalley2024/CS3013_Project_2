@@ -2,8 +2,18 @@
 #include "ray_physics.h"
 #include "ray_math.h"
 
+#include <semaphore.h>
+#include <pthread.h>
+
 static const double framerate = 25;
 static const pt3 gravity = {{0, -9.8 / framerate, 0}};
+
+typedef int semaphore;
+
+// delta_velocity(int sphere_idx,struct context *ctx )  // producer
+
+
+// delta_position // consumer
 
 
 int step_physics_velocity(struct context *ctx) {
@@ -14,6 +24,8 @@ int step_physics_velocity(struct context *ctx) {
 		sphere *si = &ctx->spheres[i];
 		pt3 *pi = &si->position;
 		pt3 *vi = &si->velocity;
+
+		// sphere interaction
 		for (int j = i+1; j < ctx->num_spheres; j++) {
 			sphere *sj = &ctx->spheres[j];
 			pt3 *pj = &sj->position;
@@ -53,6 +65,8 @@ int step_physics_velocity(struct context *ctx) {
 					vi->v[0], vi->v[1], vi->v[2],
 					vj->v[0], vj->v[1], vj->v[2]);
 		}
+		
+		// plane interaction
 		for (int j = 0; j < ctx->num_planes; j++) {
 			plane *p = &ctx->planes[j];
 			if (intersect_sphere_plane(si, p)) {
