@@ -20,7 +20,9 @@
 
 // create threads and semaphores
 pthread_t render_thread, physics_thread;
-sem_t new_frame_ready, physics_updated;
+sem_t render_updated, velocity_updated, position_updated;
+
+
 
 pthread_mutex_t mutex;
 
@@ -105,30 +107,40 @@ int main(int argc, char **argv) {
 
 		
 
-		sem_init(&new_frame_ready,0,0); // frame is not ready at first (0)
+		sem_init(&velocity_updated,0,0); // velocity is consided to not be updated (0)
+		// init position_update to 1, (want velocity to start)
+		sem_init(&position_updated,0,1); // initial position considerd updated (1)
 
-		sem_init(&physics_updated,0,1); // initial physics considerd updated (1)
+		sem_init(&render_updated,0,0); // no initial render
 
 		// thread for rendering
 		pthread_create(&render_thread,NULL,update_render,render_args);
 
-		// thread for physics
-		//(void *(*)(void *)): @caleb not entirely sure, but the error told me this what I needed
-		// void *: return type
-
-		// * pointer to function
-
 		// (void*) type of function pointer
 		pthread_create(&physics_thread,NULL,update_physics,ctx);
 
-
+		printf("INDEX: %d", frame);
 		// Join threads
-		pthread_join(render_thread, NULL);
-		pthread_join(physics_thread, NULL);
 
+		if(pthread_join(render_thread, NULL) != 0){
+			printf("thread not working");
+			exit(-1);}
+		else{
+			// printf("\nrender thread works\n");
+		}
+		if(pthread_join(physics_thread, NULL) !=0){
+			printf("thread not working");
+			exit(-1);
+
+		}
+		else{
+			printf("\n physics thread not working: %d\n",pthread_join(physics_thread, NULL) );
+
+		}
 		// Destroy semaphores
-		sem_destroy(&new_frame_ready);
-		sem_destroy(&physics_updated);
+		sem_destroy(&velocity_updated);
+		sem_destroy(&position_updated);
+		sem_destroy(&render_updated);
 	}
 
 out:
@@ -151,7 +163,7 @@ void *update_render(void *args){
 	// get render args from render_args
 
 		// wait for physics to be updated
-		// sem_wait(&physics_updated);
+		sem_wait(&position_updated);
 
 		// pthread_mutex_lock(&mutex);
 
@@ -170,7 +182,7 @@ void *update_render(void *args){
 
 		// pthread_mutex_unlock(&mutex);
 
-		// sem_post(&new_frame_ready);
+		sem_post(&render_updated);
 
 		return 0;
 
@@ -179,20 +191,24 @@ void *update_render(void *args){
 
 void *update_physics(void * _ctx){ //#TODO Make sure velocity goes before position
 
-struct context* ctx = _ctx;
-
-		// sem_wait(&new_frame_ready);
-
-		pthread_mutex_lock(&mutex);
-		step_physics_velocity(ctx);
-		pthread_mutex_unlock(&mutex);
-
-		pthread_mutex_lock(&mutex);
-		step_physics_position(ctx);
-		pthread_mutex_unlock(&mutex);
+		struct context* ctx = _ctx;
 		
+		// no need for semaphores for velocity
+		// pthread_mutex_lock(&mutex);
 
-		// sem_post(&physics_updated);
+		step_physics_velocity(ctx);
+
+		// pthread_mutex_unlock(&mutex);
+
+
+		sem_wait(&render_updated);
+		// pthread_mutex_lock(&mutex);
+
+		step_physics_position(ctx);
+
+		// pthread_mutex_unlock(&mutex);
+		sem_post(&position_updated);
 
 		return 0;
 }
+

@@ -175,6 +175,8 @@ typedef struct sphere {
 	pt3 velocity;
 	double mass;
 	double radius;
+
+	pt3 next_position;
 } sphere;
 
 typedef struct plane {

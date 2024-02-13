@@ -10,4 +10,15 @@
 int step_physics_velocity(struct context *ctx);
 int step_physics_position(struct context *ctx);
 
+
+// custom
+
+struct Sphere_Int_Args{
+    sphere *si; 
+    pt3 *pi;
+    pt3 *vi; 
+    sphere *sj;
+    int i;
+    int j;
+};
 #endif	// RAY_PHYSICS_H__
