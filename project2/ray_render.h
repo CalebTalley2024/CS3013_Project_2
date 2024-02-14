@@ -62,7 +62,7 @@ struct Render_Args {
 
 
 void *update_render(void * args);
-void *update_physics(void * _ctx);
+void *update_velocity(void * _ctx);
 
 
 
