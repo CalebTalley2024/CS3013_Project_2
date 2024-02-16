@@ -18,7 +18,7 @@
 #include <semaphore.h>
 
 // @caleb create threads and semaphores
-pthread_t console_or_disk_thread, velocity_thread, infoThreads[5];
+pthread_t console_or_disk_thread, physics_thread, render_col_threads[5];
 sem_t console_or_disk_complete, position_updated[5], render_col_updated;
 
 int main(int argc, char **argv)
@@ -94,9 +94,7 @@ int main(int argc, char **argv)
 	// However: we can parallelize the output here, as long as we are not corrupting the //
 	// framebuffer whilst outputting.                                                    //
 	// TODO: section 2: instead of one framebuffer, use
-	///////////////////////////////////////////////////////////////////////////////////////
-
-	
+	///////////////////////////////////////////////////////////////////////////////////////	
 
 	// for each frame, do this aka. for loop
 	int work_length = fb->width / 5;
@@ -135,10 +133,10 @@ int main(int argc, char **argv)
 
 	// create concurrent threads
 	pthread_create(&console_or_disk_thread, NULL, render_console_or_disk, console_disk_args); // thread for rendering
-	pthread_create(&velocity_thread, NULL, update_velocity, ctx);
+	pthread_create(&physics_thread, NULL, update_physics, ctx);
 	for (int i = 0; i < 5; i++)
 	{
-		pthread_create(&infoThreads[i], NULL, update_render_column, frame_col_info[i]);
+		pthread_create(&render_col_threads[i], NULL, update_render_column, frame_col_info[i]);
 	}
 
 	// join all threads
@@ -151,18 +149,18 @@ int main(int argc, char **argv)
 	{
 		// printf("\nrender thread works\n");
 	}
-	if (pthread_join(velocity_thread, NULL) != 0)
+	if (pthread_join(physics_thread, NULL) != 0)
 	{
 		printf("thread not working");
 		exit(-1);
 	}
 	else
 	{
-		printf("\n velocity thread not working: %d\n", pthread_join(velocity_thread, NULL));
+		printf("\n velocity thread not working: %d\n", pthread_join(physics_thread, NULL));
 	}
 	for (int i = 0; i < 5; i++)
 	{
-		pthread_join(infoThreads[i], NULL);
+		pthread_join(render_col_threads[i], NULL);
 	}
 
 	// Destroy semaphores
@@ -223,7 +221,7 @@ void *render_console_or_disk(void *args)
 }
 
 // update velocity for each frame
-void *update_velocity(void *_ctx)
+void *update_physics(void *_ctx)
 { // #TODO Make sure velocity goes before position
 	for (int frame = 0; frame < 4 * 25; frame++)
 	{

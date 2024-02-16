@@ -63,7 +63,7 @@ struct Console_Disk_Args {
 void render_scene(struct framebuffer_pt4 *fb, const struct context *ctx, int lower_x_bound, int upper_x_bound);
 
 void *render_console_or_disk(void * args);
-void *update_velocity(void * _ctx);
+void *update_physics(void * _ctx);
 void *update_render_column(void *_args);
 
 // @chris' structs
