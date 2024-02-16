@@ -21,6 +21,7 @@
 pthread_t console_or_disk_thread, physics_thread, render_col_threads[5];
 sem_t console_or_disk_complete, position_updated[5], render_col_updated;
 
+sem_t full_render_updated;
 int main(int argc, char **argv)
 {
 
@@ -54,7 +55,8 @@ int main(int argc, char **argv)
 	// Calculate framebuffer size. If we're outputting into a png file, use a high resolution.
 	// If we're rendering to the active console, use ioctls to find the window size.
 	// Initialize a framebuffer with the chosen resolution.
-	struct framebuffer_pt4 *fb = NULL;
+	struct framebuffer_pt4 *fb_curr = NULL;
+	struct framebuffer_pt4 *fb_prev = NULL;
 	int render_to_console = 1;
 	if (argc > 2)
 	{
@@ -64,7 +66,8 @@ int main(int argc, char **argv)
 		// but faster, try lowering the resolution here.                                     //
 		///////////////////////////////////////////////////////////////////////////////////////
 		// fb = new_framebuffer_pt4(2560, 1440);
-		fb = new_framebuffer_pt4(1280, 720);
+		fb_curr = new_framebuffer_pt4(1280, 720);
+		fb_prev = new_framebuffer_pt4(1280, 720);
 	}
 	else
 	{
@@ -85,7 +88,9 @@ int main(int argc, char **argv)
 			ws.ws_col = 128;
 		}
 
-		fb = new_framebuffer_pt4(ws.ws_col, ws.ws_row);
+		fb_curr = new_framebuffer_pt4(ws.ws_col, ws.ws_row);
+		fb_prev = new_framebuffer_pt4(ws.ws_col, ws.ws_row);
+
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +102,7 @@ int main(int argc, char **argv)
 	///////////////////////////////////////////////////////////////////////////////////////	
 
 	// for each frame, do this aka. for loop
-	int work_length = fb->width / 5;
+	int work_length = fb_curr->width / 5;
 	subset_info *frame_col_info[5]; // frame column info * 5
 
 	// fill frame_col_info for each column
@@ -107,7 +112,8 @@ int main(int argc, char **argv)
 		frame_col_info[i] = (subset_info *)malloc(sizeof(subset_info));
 		// init the pointers for the chunk
 		frame_col_info[i]->col_num = i; // set column number
-		frame_col_info[i]->fb = fb;
+		frame_col_info[i]->fb_curr = fb_curr;
+		frame_col_info[i]->fb_prev = fb_prev;
 		frame_col_info[i]->ctx = ctx;
 
 		// make sure info contain a workload's width of area
@@ -122,10 +128,10 @@ int main(int argc, char **argv)
 	}
 	sem_init(&console_or_disk_complete, 0, 0); // no initial image to console or disk
 	sem_init(&render_col_updated, 0, 0); // info_sem columns are initially not updated
-
+	sem_init(&full_render_updated,0,0);
 	// make console_disk_args to put all arguments into console_or_disk_thread's function
 	struct Console_Disk_Args *console_disk_args = (struct Console_Disk_Args *)malloc(sizeof(struct Console_Disk_Args));
-	console_disk_args->fb = fb;
+	console_disk_args->fb_curr = fb_curr;
 	console_disk_args->ctx = ctx;
 	console_disk_args->render_to_console = render_to_console;
 	console_disk_args->frame = 0; // start frame at 0
@@ -176,9 +182,10 @@ out:
 	if (finput)
 		fclose(finput);
 	free_context(ctx);
-	if (fb)
-		free_framebuffer_pt4(fb);
-
+	if (fb_curr)
+		free_framebuffer_pt4(fb_curr);
+	if (fb_prev)
+		free_framebuffer_pt4(fb_prev);
 	return 0;
 }
 
@@ -203,19 +210,23 @@ void *render_console_or_disk(void *args)
 			// printf(" wait for column  %d\n", i);
 			sem_wait(&render_col_updated);
 		}
+
+		console_disk_args -> fb_prev = console_disk_args -> fb_curr;
 		// allow for next frame to start rendering
 		if (console_disk_args->render_to_console)
 		{
-			render_console(console_disk_args->fb);
+			render_console(console_disk_args->fb_prev);
 			usleep(50000);
 		}
 		else
 		{
 			char filepath[128];
 			snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.bmp", console_disk_args->argv[2], frame);
-			render_bmp(console_disk_args->fb, filepath);
+			render_bmp(console_disk_args->fb_prev, filepath);
 		}
-		sem_post(&console_or_disk_complete);
+		// sem_post(&console_or_disk_complete);
+		sem_post(&full_render_updated);
+
 	}
 	return 0;
 }
@@ -229,7 +240,8 @@ void *update_physics(void *_ctx)
 		struct context *ctx = _ctx;
 		step_physics_velocity(ctx);
 		// printf("Velocity update finished\n");
-		sem_wait(&console_or_disk_complete);
+		// sem_wait(&console_or_disk_complete);
+		sem_wait(&full_render_updated);
 
 		// printf("position started\n");
 		step_physics_position(ctx);
@@ -253,7 +265,7 @@ void *update_render_col(void *_args)
 	{
 		// printf("waitng at frame %d \n",frame);
 		sem_wait(&position_updated[args->col_num]);
-		render_scene(args->fb, args->ctx, args->lower_x_bound, args->upper_x_bound);
+		render_scene(args->fb_curr, args->ctx, args->lower_x_bound, args->upper_x_bound);
 		sem_post(&render_col_updated);
 	}
 	return 0;
