@@ -147,41 +147,43 @@ int raytrace(const struct context *ctx, const ray *r, pt4 *ret, int depth) {
 	return 1;
 }
 
-void render_scene(struct framebuffer_pt4 *fb, const struct context *ctx) {
-	double left_right_angle;
-	double up_down_angle;
-	int xmax = fb->width;
-	int ymax = fb->height;
-	if (xmax > ymax) {
-		left_right_angle = M_PI / 3;
-		up_down_angle = left_right_angle / xmax * ymax;
-	} else {
-		up_down_angle = M_PI / 3;
-		left_right_angle = up_down_angle / ymax * xmax;
-	}
+ // lower_x_bound, upper_x_bound will be the bounds for rendering
+//pthread_join will be used to wait on the different chunks to fully render
 
-	double left_right_start = - left_right_angle / 2;
-	double left_right_step = left_right_angle / (xmax - 1);
-	double up_down_start = up_down_angle / 2;
-	double up_down_step = up_down_angle / (ymax - 1);
+void render_scene(struct framebuffer_pt4 *fb, const struct context *ctx, int lower_x_bound, int upper_x_bound) {
+    double left_right_angle;
+    double up_down_angle;
+    int xmax = fb->width;
+    int ymax = fb->height;
+    if (xmax > ymax) {
+        left_right_angle = M_PI / 3;
+        up_down_angle = left_right_angle / xmax * ymax;
+    } else {
+        up_down_angle = M_PI / 3;
+        left_right_angle = up_down_angle / ymax * xmax;
+    }
 
-	//printf("left_right_start %lf left_right_step %lf up_down_start %lf up_down_step %lf\n", left_right_start, left_right_step, up_down_start, up_down_step);
+    double left_right_start = - left_right_angle / 2;
+    double left_right_step = left_right_angle / (xmax - 1);
+    double up_down_start = up_down_angle / 2;
+    double up_down_step = up_down_angle / (ymax - 1);
 
-	for (int x = 0; x < xmax; x++) {
-		double xangle = -(left_right_start + left_right_step * x);
-		for (int y = 0; y < ymax; y++) {
-			double yangle = up_down_start - up_down_step * y;
+    //printf("left_right_start %lf left_right_step %lf up_down_start %lf up_down_step %lf\n", left_right_start, left_right_step, up_down_start, up_down_step);
 
-			// I'm 99% sure this is wrong but it looks okay
-			pt3 direction = {{sin(xangle), sin(yangle), cos(yangle) * cos(xangle)}};
-			pt3_normalize_mut(&direction);
-			ray r = {{{0, 0, -20}}, direction};
-			//printf("ray: %lf %lf %lf\n", direction.v[0], direction.v[1], direction.v[2]);
-			pt4 px_color = {0};
-			raytrace(ctx, &r, &px_color, 3);
-			framebuffer_pt4_set(fb, x, y, px_color);
-		}
-	}
+    for (int x = lower_x_bound; x < upper_x_bound; x++) {
+        double xangle = -(left_right_start + left_right_step * x);
+        for (int y = 0; y < ymax; y++) {
+            double yangle = up_down_start - up_down_step * y;
 
-}
+            // I'm 99% sure this is wrong but it looks okay
+            pt3 direction = {{sin(xangle), sin(yangle), cos(yangle) * cos(xangle)}};
+            pt3_normalize_mut(&direction);
+            ray r = {{{0, 0, -20}}, direction};
+            //printf("ray: %lf %lf %lf\n", direction.v[0], direction.v[1], direction.v[2]);
+            pt4 px_color = {0};
+            raytrace(ctx, &r, &px_color, 3);
+            framebuffer_pt4_set(fb, x, y, px_color);
+        }
+    }
 
+} 

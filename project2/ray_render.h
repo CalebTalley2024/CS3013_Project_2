@@ -43,7 +43,7 @@ static inline t* framebuffer_##t##_get(struct framebuffer_##t *fb, int x, int y)
 //DEFINE_FRAMEBUFFER(uint8_t)	// for the rgb data before export
 DEFINE_FRAMEBUFFER(pt4, 1)	// for the actual rendering passes
 
-void render_scene(struct framebuffer_pt4 *fb, const struct context* ctx);
+// void render_scene(struct framebuffer_pt4 *fb, const struct context* ctx);
 
 static inline uint8_t color_double_to_u8(double d) {
 	if (d < 0) return 0;
@@ -60,9 +60,20 @@ struct Render_Args {
 	char** argv;
 };
 
+void render_scene(struct framebuffer_pt4 *fb, const struct context *ctx, int lower_x_bound, int upper_x_bound);
 
-void *update_render(void * args);
+void *render_console_or_disk(void * args);
 void *update_velocity(void * _ctx);
+void *update_render_column(void *_args);
+
+// @chris' structs
+typedef struct subset_info {
+	int info_num;
+    struct framebuffer_pt4 *fb;
+    const struct context *ctx;
+    int lower_x_bound;
+    int upper_x_bound;
+} subset_info;
 
 
 
