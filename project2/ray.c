@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 	pthread_create(&physics_thread, NULL, update_physics, ctx);
 	for (int i = 0; i < 5; i++)
 	{
-		pthread_create(&render_col_threads[i], NULL, update_render_column, frame_col_info[i]);
+		pthread_create(&render_col_threads[i], NULL, update_render_col, frame_col_info[i]);
 	}
 
 	// join all threads
@@ -246,7 +246,7 @@ void *update_physics(void *_ctx)
 }
 
 // render one column of a each frame
-void *update_render_column(void *_args)
+void *update_render_col(void *_args)
 {
 	subset_info *args = _args;
 	for (int frame = 0; frame < 4 * 25; frame++)

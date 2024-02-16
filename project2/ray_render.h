@@ -64,7 +64,7 @@ void render_scene(struct framebuffer_pt4 *fb, const struct context *ctx, int low
 
 void *render_console_or_disk(void * args);
 void *update_physics(void * _ctx);
-void *update_render_column(void *_args);
+void *update_render_col(void *_args);
 
 // @chris' structs
 typedef struct subset_info {

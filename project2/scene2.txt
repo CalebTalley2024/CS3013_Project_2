@@ -1,0 +1,87 @@
+plane {
+	color {
+		rgba {0.3 0.3 0.3 1.0 }
+		reflectance 1.0
+	}
+	pos { 0 -4 0 }
+	normal { 0 1 0 }
+}
+
+sphere {
+	color {
+		rgba { 1.0 1.0 0.1 0.8 }
+		reflectance 0.2
+	}
+	pos { 30 0 14 }
+	velocity { -120 0 0 }
+	radius 2
+}
+sphere {
+	color {
+		rgba { 0.7 0.4 0.2 0.8 }
+		reflectance 0.2
+	}
+	radius 0.5
+		pos { 4 5 12 }
+		pos { 0.00318530684293305 8.99999873172734 14 }
+		pos { -1.99632079742248 8.46622320022506 12 }
+		pos { -2.00735163688924 1.5401532684412 14 }
+		pos { -0.00955591244912615 1.00001141444913 12 }
+		pos { 1.99079777505476 1.53060174975011 14 }
+		pos { 3.45824712682525 2.98989383121068 12 }
+}
+sphere {
+	color {
+		rgba { 0.2 0.2 0.2 0.8 }
+		reflectance 0.4
+	}
+	pos { 10 1 20 }
+	velocity { 0 -25 -40  }
+	radius 1
+}
+sphere {
+	color {
+		rgba { 0.1 0.1 0.6 0.8 }
+		reflectance 0.3
+	}
+	pos { -10 0 14 }
+	velocity { 20 0 0 }
+	radius 4
+}
+sphere {
+	color {
+		rgba { 0.1 1.0 1.0 0.8 }
+		reflectance 0.3
+	}
+	radius 3
+		pos { 10 -10 0 }
+}
+
+sphere {
+	color {
+		rgba { 1.0 1.0 1.0 0.8 }
+		reflectance 0.3
+	}
+	radius 8
+	pos { 0 20 14 }
+}
+
+light {
+	color {
+		rgba { 1.0 0.8 0.8 1.0 }
+	}
+	pos { 50 100 0 }
+}
+light {
+	color {
+		rgba { 0.8 1.0 0.8 1.0 }
+	}
+	pos { 0 100 0 }
+}
+light {
+	color {
+		rgba { 0.8 0.8 1.0 1.0 }
+	}
+	pos { 0 100 50 }
+}
+
