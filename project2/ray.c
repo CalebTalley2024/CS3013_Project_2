@@ -21,12 +21,12 @@
 
 // @caleb create threads and semaphores
 pthread_t render_thread, velocity_thread;
-sem_t render_updated, position_updated;
+sem_t render_updated, position_updated[5];
 sem_t velocity_updated;
 
 //@both info threads
 pthread_t infoThreads[5];
-sem_t info_sem_updated_idx[5];
+sem_t info_sem_updated_idx;
 
 
 
@@ -109,7 +109,10 @@ int main(int argc, char **argv)
 
 	// sem_init(&velocity_updated, 0, 0); // velocity is consided to not be updated (0)
 	// init position_update to 1, (want velocity to start)
-	sem_init(&position_updated, 0, 5); // initial position considerd updated (1 * 5)
+	for (int i = 0; i<5; i++){
+		sem_init(&position_updated[i], 0, 1); // initial position considerd updated (1 * 5)
+	}
+	
 
 	sem_init(&render_updated, 0, 0); // no initial render
 
@@ -148,10 +151,10 @@ int main(int argc, char **argv)
 		info_chunks[i]->lower_x_bound = i * work_length;
 		info_chunks[i]->upper_x_bound = (i + 1) * work_length;
 
-		// init the semaphores for chunk
-		sem_init(&info_sem_updated_idx[i], 0, 0); // no initial render
-	}
 
+	}
+		// init the semaphores for chunk
+		sem_init(&info_sem_updated_idx, 0, 0); // no initial render
 	// render chunks concurrently
 	for (int i = 0; i<5; i++){
 		pthread_create(&infoThreads[i], NULL, update_render_column, info_chunks[i]);
@@ -184,7 +187,11 @@ int main(int argc, char **argv)
 	// Destroy semaphores
 	// sem_destroy(&velocity_updated);
 	sem_destroy(&render_updated);
-	sem_destroy(&position_updated);
+
+		for (int i = 0; i<5; i++){
+		sem_destroy(&position_updated[i]); // initial position considerd updated (1 * 5)
+	}
+	
 
 out:
 	yylex_destroy(scanner);
@@ -201,12 +208,10 @@ out:
 
 void *render_console_or_disk(void *args)
 {
-	// printf("\nhe\n");
 	// @caleb arugments: struct framebuffer_pt4 * fb,struct context* ctx, int render_to_console,int frame,char **argv
 
 	// cast void pointer to render_arg pointer
 	struct Render_Args *render_args = args;
-	// printf("\nshe\n");
 	// get render args from render_args
 
 	for (int frame = 0; frame < 4 * 25; frame++)
@@ -217,15 +222,12 @@ void *render_console_or_disk(void *args)
 
 		// pthread_mutex_lock(&mutex);
 		for (int i = 0; i<5; i++){
-			printf(" wait for column  %d\n", i);
-			sem_wait(&info_sem_updated_idx[i]);
+			// printf(" wait for column  %d\n", i);
+			sem_wait(&info_sem_updated_idx);
 			
 		}
-		// pthread_mutex_unlock(&mutex);
 
-		// printf("\n received all columns\n");
 		// allow for next frame to start rendering
-
 
 		if (render_args->render_to_console)
 		{
@@ -261,29 +263,20 @@ void *update_velocity(void *_ctx)
 		step_physics_velocity(ctx);
 
 		// printf("Velocity update finished\n");
-		// sem_post(&velocity_updated);
 
 		sem_wait(&render_updated);
-		// sem_wait(&velocity_updated);
 
 		// printf("position started\n");
 		step_physics_position(ctx);
 		// printf("position finished\n");
 
+		printf("Frame %d is done\n",frame);
+
 		// pthread_mutex_lock(&mutex);
 		for(int i = 0; i< 5;i++){
-			sem_post(&position_updated);
+			sem_post(&position_updated[i]);
 		}
-		// pthread_mutex_unlock(&mutex);
 
-		sem_destroy(&position_updated);
-		sem_init(&position_updated, 0, 5);
-
-		int x;
-		sem_getvalue(&position_updated,&x);
-		printf("val of position sem: %d \n", x);
-		
-		// Join threads
 	}
 
 	return 0;
@@ -295,14 +288,14 @@ void *update_render_column(void *_args){
 	for (int frame = 0; frame < 4 * 25; frame++)
 	{
 	// printf("waitng at frame %d \n",frame);
-	sem_wait(&position_updated);
+	sem_wait(&position_updated[args->info_num]);
 	
 
     render_scene(args->fb, args->ctx, args->lower_x_bound, args->upper_x_bound);
 
-	// printf("\nrender for column %d\n", args->info_num);
+	// printf("render for column %d\n", args->info_num);
 
-	sem_post(&info_sem_updated_idx[args->info_num]);
+	sem_post(&info_sem_updated_idx);
 	}
 
 	return 0;
