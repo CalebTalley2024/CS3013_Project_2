@@ -17,20 +17,9 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-
-
 // @caleb create threads and semaphores
-pthread_t render_thread, velocity_thread;
-sem_t render_updated, position_updated[5];
-sem_t velocity_updated;
-
-//@both info threads
-pthread_t infoThreads[5];
-sem_t info_sem_updated_idx;
-
-
-
-pthread_mutex_t mutex;
+pthread_t console_or_disk_thread, velocity_thread, infoThreads[5];
+sem_t console_or_disk_complete, position_updated[5], render_col_updated;
 
 int main(int argc, char **argv)
 {
@@ -107,61 +96,53 @@ int main(int argc, char **argv)
 	// TODO: section 2: instead of one framebuffer, use
 	///////////////////////////////////////////////////////////////////////////////////////
 
-	// sem_init(&velocity_updated, 0, 0); // velocity is consided to not be updated (0)
-	// init position_update to 1, (want velocity to start)
-	for (int i = 0; i<5; i++){
-		sem_init(&position_updated[i], 0, 1); // initial position considerd updated (1 * 5)
-	}
 	
 
-	sem_init(&render_updated, 0, 0); // no initial render
+	// for each frame, do this aka. for loop
+	int work_length = fb->width / 5;
+	subset_info *frame_col_info[5]; // frame column info * 5
 
-	// make render_args to put all arguements into renderThread
-	struct Render_Args *render_args = (struct Render_Args *)malloc(sizeof(struct Render_Args));
-
-	render_args->fb = fb;
-	render_args->ctx = ctx;
-	render_args->render_to_console = render_to_console;
-	// render_args->frame = frame;
-	render_args->frame = 0; // start frame at 0
-
-	render_args->argv = argv;
-
-	pthread_create(&render_thread, NULL, render_console_or_disk, render_args); // thread for rendering
-	pthread_create(&velocity_thread, NULL, update_velocity, ctx);	  // (void*) type of function pointer
-
-
-	//for each frame, do this aka. for loop
-	int work_length = fb->width/5;
-
-	// subset_info *info_chunks[5] = (struct subset_info*)malloc(sizeof(subset_info));
-	subset_info *info_chunks[5];
-
-	for(int i = 0; i<5; i++){
-	info_chunks[i] = (subset_info*)malloc(sizeof(subset_info) );
-
-	}
-
-	// fill info_chunks
-	for (int i = 0; i < 5; i++) {
+	// fill frame_col_info for each column
+	for (int i = 0; i < 5; i++)
+	{
+		// allocate memory
+		frame_col_info[i] = (subset_info *)malloc(sizeof(subset_info));
 		// init the pointers for the chunk
-		info_chunks[i] -> info_num = i;
-		info_chunks[i]->fb = fb;
-		info_chunks[i]->ctx = ctx;
-		info_chunks[i]->lower_x_bound = i * work_length;
-		info_chunks[i]->upper_x_bound = (i + 1) * work_length;
+		frame_col_info[i]->col_num = i; // set column number
+		frame_col_info[i]->fb = fb;
+		frame_col_info[i]->ctx = ctx;
 
-
-	}
-		// init the semaphores for chunk
-		sem_init(&info_sem_updated_idx, 0, 0); // no initial render
-	// render chunks concurrently
-	for (int i = 0; i<5; i++){
-		pthread_create(&infoThreads[i], NULL, update_render_column, info_chunks[i]);
+		// make sure info contain a workload's width of area
+		frame_col_info[i]->lower_x_bound = i * work_length;
+		frame_col_info[i]->upper_x_bound = (i + 1) * work_length;
 	}
 
+	// initiate semaphores
+	for (int col = 0; col < 5; col++) // for each column thread
+	{
+		sem_init(&position_updated[col], 0, 1); // initial position for column i is considered updated
+	}
+	sem_init(&console_or_disk_complete, 0, 0); // no initial image to console or disk
+	sem_init(&render_col_updated, 0, 0); // info_sem columns are initially not updated
 
-	if (pthread_join(render_thread, NULL) != 0)
+	// make console_disk_args to put all arguments into console_or_disk_thread's function
+	struct Console_Disk_Args *console_disk_args = (struct Console_Disk_Args *)malloc(sizeof(struct Console_Disk_Args));
+	console_disk_args->fb = fb;
+	console_disk_args->ctx = ctx;
+	console_disk_args->render_to_console = render_to_console;
+	console_disk_args->frame = 0; // start frame at 0
+	console_disk_args->argv = argv;
+
+	// create concurrent threads
+	pthread_create(&console_or_disk_thread, NULL, render_console_or_disk, console_disk_args); // thread for rendering
+	pthread_create(&velocity_thread, NULL, update_velocity, ctx);
+	for (int i = 0; i < 5; i++)
+	{
+		pthread_create(&infoThreads[i], NULL, update_render_column, frame_col_info[i]);
+	}
+
+	// join all threads
+	if (pthread_join(console_or_disk_thread, NULL) != 0)
 	{
 		printf("thread not working");
 		exit(-1);
@@ -179,19 +160,18 @@ int main(int argc, char **argv)
 	{
 		printf("\n velocity thread not working: %d\n", pthread_join(velocity_thread, NULL));
 	}
-
-	// join infoThreads
-	for (int i = 0; i<5; i++){
-		pthread_join(infoThreads[i],NULL);
+	for (int i = 0; i < 5; i++)
+	{
+		pthread_join(infoThreads[i], NULL);
 	}
-	// Destroy semaphores
-	// sem_destroy(&velocity_updated);
-	sem_destroy(&render_updated);
 
-		for (int i = 0; i<5; i++){
+	// Destroy semaphores
+	sem_destroy(&console_or_disk_complete);
+	sem_destroy(&render_col_updated);
+	for (int i = 0; i < 5; i++)
+	{
 		sem_destroy(&position_updated[i]); // initial position considerd updated (1 * 5)
 	}
-	
 
 out:
 	yylex_destroy(scanner);
@@ -205,98 +185,78 @@ out:
 }
 
 
-
+// either render to console or save rendered photo to disk as bmp
+// done for each frame
 void *render_console_or_disk(void *args)
 {
 	// @caleb arugments: struct framebuffer_pt4 * fb,struct context* ctx, int render_to_console,int frame,char **argv
 
 	// cast void pointer to render_arg pointer
-	struct Render_Args *render_args = args;
-	// get render args from render_args
+	struct Console_Disk_Args *console_disk_args = args;
+	// get render args from console_disk_args
 
 	for (int frame = 0; frame < 4 * 25; frame++)
 	{
-		
 		// wait for all info frame columns  to be updated
 		// printf("staring console/disk\n");
 
-		// pthread_mutex_lock(&mutex);
-		for (int i = 0; i<5; i++){
-			// printf(" wait for column  %d\n", i);
-			sem_wait(&info_sem_updated_idx);
-			
-		}
-
-		// allow for next frame to start rendering
-
-		if (render_args->render_to_console)
+		for (int i = 0; i < 5; i++)
 		{
-			render_console(render_args->fb);
+			// printf(" wait for column  %d\n", i);
+			sem_wait(&render_col_updated);
+		}
+		// allow for next frame to start rendering
+		if (console_disk_args->render_to_console)
+		{
+			render_console(console_disk_args->fb);
 			usleep(50000);
 		}
 		else
 		{
 			char filepath[128];
-			// snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.png", argv[2], frame);
-			// render_png(fb(physics), filepath);
-			snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.bmp", render_args->argv[2], frame);
-			render_bmp(render_args->fb, filepath);
+			snprintf(filepath, sizeof(filepath) - 1, "%s-%05d.bmp", console_disk_args->argv[2], frame);
+			render_bmp(console_disk_args->fb, filepath);
 		}
-		// printf("Rendering finished\n");
-		sem_post(&render_updated);
-		
+		sem_post(&console_or_disk_complete);
 	}
 	return 0;
 }
 
+// update velocity for each frame
 void *update_velocity(void *_ctx)
 { // #TODO Make sure velocity goes before position
-
 	for (int frame = 0; frame < 4 * 25; frame++)
 	{
-		
-		// printf("\nINDEX: %d \n", frame);
-		// no need for semaphores for velocity
 		// printf("Velocity update started\n");
-
 		struct context *ctx = _ctx;
 		step_physics_velocity(ctx);
-
 		// printf("Velocity update finished\n");
-
-		sem_wait(&render_updated);
+		sem_wait(&console_or_disk_complete);
 
 		// printf("position started\n");
 		step_physics_position(ctx);
 		// printf("position finished\n");
 
-		printf("Frame %d is done\n",frame);
+		printf("Frame %d is done\n", frame); // keeps track of current frame
 
-		// pthread_mutex_lock(&mutex);
-		for(int i = 0; i< 5;i++){
+		for (int i = 0; i < 5; i++)
+		{
 			sem_post(&position_updated[i]);
 		}
-
 	}
-
 	return 0;
 }
 
-// used to multiple columns
-void *update_render_column(void *_args){
-    subset_info *args = _args;
+// render one column of a each frame
+void *update_render_column(void *_args)
+{
+	subset_info *args = _args;
 	for (int frame = 0; frame < 4 * 25; frame++)
 	{
-	// printf("waitng at frame %d \n",frame);
-	sem_wait(&position_updated[args->info_num]);
-	
-
-    render_scene(args->fb, args->ctx, args->lower_x_bound, args->upper_x_bound);
-
-	// printf("render for column %d\n", args->info_num);
-
-	sem_post(&info_sem_updated_idx);
+		// printf("waitng at frame %d \n",frame);
+		sem_wait(&position_updated[args->col_num]);
+		render_scene(args->fb, args->ctx, args->lower_x_bound, args->upper_x_bound);
+		sem_post(&render_col_updated);
 	}
-
 	return 0;
 }

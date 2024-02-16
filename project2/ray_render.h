@@ -52,7 +52,7 @@ static inline uint8_t color_double_to_u8(double d) {
 }
 
 // @caleb custom function and struct declartions
-struct Render_Args {
+struct Console_Disk_Args {
 	struct framebuffer_pt4* fb;
 	struct context* ctx;
 	int render_to_console;
@@ -68,7 +68,7 @@ void *update_render_column(void *_args);
 
 // @chris' structs
 typedef struct subset_info {
-	int info_num;
+	int col_num;
     struct framebuffer_pt4 *fb;
     const struct context *ctx;
     int lower_x_bound;

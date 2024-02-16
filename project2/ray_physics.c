@@ -9,11 +9,6 @@ static const pt3 gravity = {{0, -9.8 / framerate, 0}};
 
 typedef int semaphore;
 
-// delta_velocity(int sphere_idx,struct context *ctx )  // producer
-
-
-// delta_position // consumer
-
 
 int step_physics_velocity(struct context *ctx) {
 	// First we loop through all the spheres in the world, collision detect them with everything else,
