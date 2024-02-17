@@ -17,9 +17,12 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#define NUM_COLS 100
+const int num_cols = 100;
+
 // @caleb create threads and semaphores
-pthread_t console_or_disk_thread, physics_thread, render_col_threads[5];
-sem_t console_or_disk_complete, position_updated[5], render_col_updated;
+pthread_t console_or_disk_thread, physics_thread, render_col_threads[NUM_COLS];
+sem_t console_or_disk_complete, position_updated[NUM_COLS], render_col_updated;
 
 sem_t full_render_updated;
 int main(int argc, char **argv)
@@ -102,11 +105,15 @@ int main(int argc, char **argv)
 	///////////////////////////////////////////////////////////////////////////////////////	
 
 	// for each frame, do this aka. for loop
-	int work_length = fb_curr->width / 5;
-	subset_info *frame_col_info[5]; // frame column info * 5
+
+	
+	// int num_cols; // number of separated columns per frame
+	int work_length = fb_curr->width / num_cols;
+
+	subset_info *frame_col_info[NUM_COLS]; // frame column info * 5 ?
 
 	// fill frame_col_info for each column
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < num_cols; i++)
 	{
 		// allocate memory
 		frame_col_info[i] = (subset_info *)malloc(sizeof(subset_info));
@@ -122,7 +129,7 @@ int main(int argc, char **argv)
 	}
 
 	// initiate semaphores
-	for (int col = 0; col < 5; col++) // for each column thread
+	for (int col = 0; col < num_cols; col++) // for each column thread
 	{
 		sem_init(&position_updated[col], 0, 1); // initial position for column i is considered updated
 	}
@@ -140,7 +147,7 @@ int main(int argc, char **argv)
 	// create concurrent threads
 	pthread_create(&console_or_disk_thread, NULL, render_console_or_disk, console_disk_args); // thread for rendering
 	pthread_create(&physics_thread, NULL, update_physics, ctx);
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < num_cols; i++)
 	{
 		pthread_create(&render_col_threads[i], NULL, update_render_col, frame_col_info[i]);
 	}
@@ -164,7 +171,7 @@ int main(int argc, char **argv)
 	{
 		printf("\n velocity thread not working: %d\n", pthread_join(physics_thread, NULL));
 	}
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < num_cols; i++)
 	{
 		pthread_join(render_col_threads[i], NULL);
 	}
@@ -172,9 +179,9 @@ int main(int argc, char **argv)
 	// Destroy semaphores
 	sem_destroy(&console_or_disk_complete);
 	sem_destroy(&render_col_updated);
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < num_cols; i++)
 	{
-		sem_destroy(&position_updated[i]); // initial position considerd updated (1 * 5)
+		sem_destroy(&position_updated[i]); // initial position considerd updated (1 * num_cols)
 	}
 
 out:
@@ -205,7 +212,7 @@ void *render_console_or_disk(void *args)
 		// wait for all info frame columns  to be updated
 		// printf("staring console/disk\n");
 
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < num_cols; i++)
 		{
 			// printf(" wait for column  %d\n", i);
 			sem_wait(&render_col_updated);
@@ -249,7 +256,7 @@ void *update_physics(void *_ctx)
 
 		printf("Frame %d is done\n", frame); // keeps track of current frame
 
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < num_cols; i++)
 		{
 			sem_post(&position_updated[i]);
 		}
